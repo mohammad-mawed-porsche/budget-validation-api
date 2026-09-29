@@ -82,6 +82,48 @@ does **not** reliably refresh cached parameters. Do not edit secrets into Lambda
 environment variables to bypass Parameter Store. Update dependent frontend
 credentials too; see [SECURITY.md](../SECURITY.md) for session invalidation.
 
+### API account username changes
+
+Parameter Store's `/budget-validation/production/AUTH_USERS_JSON` is the source
+of truth for production API usernames; they are not hard-coded in application
+code or this runbook. The dashboard's server-side `BUDGET_VALIDATION_API_USERNAME`
+and `BUDGET_VALIDATION_API_PASSWORD` must identify the same enabled AWS account.
+Neither a Git push nor changing those frontend variables updates `AUTH_USERS_JSON`.
+
+For an explicitly approved rename, change only the selected user's `username`
+in `/budget-validation/production/AUTH_USERS_JSON`. Preserve that user's
+existing `passwordHash`, `roles` and `disabled` value, every other user, and the
+parameter's SecureString type and encryption key. Do not add a second account
+or an old-name fallback. A username rename preserves the existing password; it
+does not rotate a password that has been exposed.
+
+Refresh only the API Lambda's warm environments after updating the parameter.
+Use the reviewed CDK path with a new non-secret revision marker:
+
+```sh
+npm run aws:diff:code
+AUTH_CONFIG_VERSION=ssm-auth-users-v5 npm run aws:deploy:code
+```
+
+`AuthConfigurationVersion` is a CloudFormation parameter exposed to the API
+Lambda as `AUTH_CONFIG_VERSION`. It exists only to replace warm environments;
+the username, hash and roles still come from encrypted Parameter Store and are
+never placed in CDK context, source, Lambda environment variables, stack
+parameters or outputs. The deployment preserves all existing CloudFormation
+parameters. CDK's `diff` command shows the new parameter wiring but does not
+accept a parameter override; the reviewed value is supplied only to `deploy`.
+Wait for `UPDATE_COMPLETE` before verifying the new account. Do not alter the
+workflow Lambda, schedule, integration secrets or signing keys for a
+username-only rename.
+
+After the new configuration is loaded, access and refresh tokens for the old
+username are rejected because that account no longer exists. Historical auth
+records are not deleted, and dashboard cookies use a separate signing key;
+sign out and sign back in to verify the new account. Update the frontend
+username if needed and redeploy it so its runtime reads the new configuration.
+Check sign-in and read-only schedule/history requests without starting a run
+or sending a Slack test message.
+
 ## Verification
 
 CDK prints the API URL after deployment. Verify the public endpoints first:
@@ -94,9 +136,10 @@ curl -fsS "$API_URL/ready" | jq
 
 Then log in and start a single-item dry run. A dry run reads Productive and Heimdall but does not update Heimdall or send Slack notifications:
 
-```sh
-read -s "PASSWORD?Admin password: "; echo
-TOKEN=$(printf '%s' "$PASSWORD" | jq -Rs '{username:"admin",password:.}' | \
+```zsh
+read "API_USERNAME?Configured API username: "
+read -s "PASSWORD?API account password: "; echo
+TOKEN=$(printf '%s' "$PASSWORD" | jq -Rs --arg username "$API_USERNAME" '{username:$username,password:.}' | \
   curl -fsS -X POST "$API_URL/v1/auth/login" \
     -H 'Content-Type: application/json' --data-binary @- | \
   jq -er '.accessToken')
@@ -110,7 +153,7 @@ echo "$START" | jq
 RUN_ID=$(echo "$START" | jq -r '.runId')
 curl -fsS "$API_URL/v1/runs/$RUN_ID" \
   -H "Authorization: Bearer $TOKEN" | jq
-unset PASSWORD TOKEN
+unset API_USERNAME PASSWORD TOKEN
 ```
 
 Use a non-dry run only after inspecting the dry-run result. A live run can update Heimdall and send an invalid-budget message to the configured private Slack channel.

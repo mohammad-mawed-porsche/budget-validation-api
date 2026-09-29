@@ -116,6 +116,18 @@ integration parameters. Both can read the Slack webhook when delivery is
 enabled. Parameter values are not included in Lambda environment variables,
 CDK context, CloudFormation, or stack outputs.
 
+After an approved authentication-parameter change, review the code-only CDK
+diff, then set a new non-secret revision only for deployment:
+
+```sh
+npm run aws:diff:code
+AUTH_CONFIG_VERSION=ssm-auth-users-v5 npm run aws:deploy:code
+```
+
+This updates only the API Lambda configuration so new execution environments
+reload the encrypted value. It never copies the username, password hash, or
+roles into the synthesized template.
+
 ## Deploy
 
 For an existing stack, the safe release path is the code-only deployment described in [../docs/deployment.md](../docs/deployment.md). It carries forward the deployed CloudFormation parameters and never overwrites SSM secrets:

@@ -1,6 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { BudgetValidationStack } from "../lib/budget-validation-stack.js";
 
@@ -98,6 +98,25 @@ describe("BudgetValidationStack", () => {
         ]),
       },
     });
+  });
+
+  it("reloads API authentication from SSM using a non-secret revision marker", () => {
+    template.hasParameter("AuthConfigurationVersion", {
+      Type: "String",
+      Default: "initial",
+      AllowedPattern: "^[A-Za-z0-9._-]{1,64}$",
+    });
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Handler: "api.handler",
+      Environment: {
+        Variables: Match.objectLike({ AUTH_CONFIG_VERSION: { Ref: "AuthConfigurationVersion" } }),
+      },
+    });
+    const workflowFunctions = template.findResources("AWS::Lambda::Function", {
+      Properties: { Handler: "workflow.handler" },
+    });
+    expect(Object.values(workflowFunctions)).toHaveLength(1);
+    expect(Object.values(workflowFunctions)[0]?.Properties?.Environment?.Variables).not.toHaveProperty("AUTH_CONFIG_VERSION");
   });
 
   it("keeps Slack disabled by default and configures both notification entrypoints together", () => {

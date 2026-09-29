@@ -149,6 +149,16 @@ The local scheduler stores the last local date it triggered, so polling cannot s
 `frontend-vis`. Its server authenticates to this API; AWS credentials and the
 Slack webhook are not needed in the browser or frontend configuration.
 
+Production API usernames are configured in Parameter Store's `AUTH_USERS_JSON`,
+not hard-coded in this repository. The frontend's `BUDGET_VALIDATION_API_USERNAME`
+must match the selected enabled account, and
+`BUDGET_VALIDATION_API_PASSWORD` must be the password verified by its Argon2id
+hash in AWS `AUTH_USERS_JSON`. Dashboard sign-in and server-to-server API access
+use the same pair; changing a frontend environment variable does not create or
+rename an AWS user. The local examples above use the example `admin` account,
+not the production account. See the [account migration procedure](docs/deployment.md#api-account-username-changes)
+before changing a deployed username.
+
 The dashboard edits the daily schedule and polls run and delivery history every
 15 seconds. Activity, Runs and Slack deliveries have local search, status and
 rolling time filters. Filtering and pagination cover only the loaded history

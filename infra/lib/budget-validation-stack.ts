@@ -89,6 +89,12 @@ export class BudgetValidationStack extends cdk.Stack {
       allowedValues: ["true", "false"],
       description: "Deliver confirmed invalid-budget notifications through the Slack incoming webhook stored in SSM.",
     });
+    const authConfigurationVersion = new cdk.CfnParameter(this, "AuthConfigurationVersion", {
+      type: "String",
+      default: "initial",
+      allowedPattern: "^[A-Za-z0-9._-]{1,64}$",
+      description: "Non-secret revision marker used to reload API Lambda authentication configuration from SSM.",
+    });
 
     const table = new dynamodb.Table(this, "StateTable", {
       partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
@@ -164,6 +170,7 @@ export class BudgetValidationStack extends cdk.Stack {
       environment: {
         ...commonEnvironment,
         AUTH_MODE: "local-users",
+        AUTH_CONFIG_VERSION: authConfigurationVersion.valueAsString,
         AUTH_COOKIE_SECURE: "true",
         SLACK_NOTIFICATIONS_ENABLED: slackNotificationsEnabled.valueAsString,
         PRODUCTIVE_API_KEY: "not-used-by-api-lambda",

@@ -46,6 +46,10 @@ if (slackNotificationsEnabled) {
     throw new Error("SLACK_NOTIFICATIONS_ENABLED must be true or false.");
   }
 }
+const authConfigurationVersion = process.env.AUTH_CONFIG_VERSION?.trim();
+if (authConfigurationVersion && !/^[A-Za-z0-9._-]{1,64}$/.test(authConfigurationVersion)) {
+  throw new Error("AUTH_CONFIG_VERSION must contain 1-64 letters, numbers, dots, underscores, or hyphens.");
+}
 
 console.log("Running the application, infrastructure, and synthesis checks.");
 run("npm", ["run", "infra:check"]);
@@ -65,6 +69,12 @@ if (mode === "deploy") {
     cdkArguments.push(
       "--parameters",
       `${stackName}:SlackNotificationsEnabled=${slackNotificationsEnabled}`,
+    );
+  }
+  if (authConfigurationVersion) {
+    cdkArguments.push(
+      "--parameters",
+      `${stackName}:AuthConfigurationVersion=${authConfigurationVersion}`,
     );
   }
 }
