@@ -28,8 +28,7 @@ const legacySharePointEnvironment = optional("SHAREPOINT_ENVIRONMENT")?.toLowerC
 if (legacySharePointEnvironment && !new Set(["test", "production"]).has(legacySharePointEnvironment)) {
   throw new Error("SHAREPOINT_ENVIRONMENT must be either test or production.");
 }
-const deploymentEnvironment = (optional("DEPLOY_ENVIRONMENT") ?? legacySharePointEnvironment ?? "prod").toLowerCase();
-const parameterEnvironment = deploymentEnvironment === "production" ? "prod" : deploymentEnvironment;
+const deploymentEnvironment = (optional("DEPLOY_ENVIRONMENT") ?? legacySharePointEnvironment ?? "production").toLowerCase();
 const legacySiteKey = legacySharePointEnvironment === "production" ? "SHAREPOINT_PRODUCTION_SITE_ID" : "SHAREPOINT_TEST_SITE_ID";
 const legacyListKey = legacySharePointEnvironment === "production" ? "SHAREPOINT_PRODUCTION_LIST_ID" : "SHAREPOINT_TEST_LIST_ID";
 const siteId = optional("HEIMDALL_SITE_ID") ?? required(legacySiteKey);
@@ -75,7 +74,7 @@ try {
   throw new Error("AUTH_USERS_JSON must contain a non-empty JSON array.");
 }
 
-const parameterPrefix = process.env.SECURE_PARAMETER_PREFIX ?? `/budget-validation/${parameterEnvironment}`;
+const parameterPrefix = process.env.SECURE_PARAMETER_PREFIX ?? `/budget-validation/${deploymentEnvironment}`;
 const secureParameters = {
   AUTH_SESSION_SECRET: sessionSecret,
   AUTH_USERS_JSON: authUsersJson,

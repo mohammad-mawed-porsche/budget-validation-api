@@ -33,7 +33,7 @@ export class BudgetValidationStack extends cdk.Stack {
     });
     const parameterPrefix = new cdk.CfnParameter(this, "SecureParameterPrefix", {
       type: "String",
-      default: "/budget-validation/prod",
+      default: "/budget-validation/production",
       allowedPattern: "^/[A-Za-z0-9_./-]+$",
       description: "SSM path containing the required SecureString parameters.",
     });

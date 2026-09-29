@@ -11,7 +11,7 @@ A standalone Fastify/TypeScript service for the **Budget validation** workflow:
 
 This folder contains only the workflow API. It does not copy the dashboard or other `frontend-vis` features.
 
-See [docs/architecture.md](docs/architecture.md) for the request flow and the PNG architecture diagram.
+See [docs/architecture.md](docs/architecture.md) for the request flow and the PNG architecture diagram. The SSO, CDK, secret-handling, verification, and rollback procedure is in [docs/deployment.md](docs/deployment.md).
 
 ## Important behavior
 
@@ -185,5 +185,5 @@ npm run build
 npm run check
 ```
 
-The production AWS deployment is defined with TypeScript CDK in [infra/README.md](infra/README.md). It uses API Gateway, separate API and workflow Lambdas, SQS with a dead-letter queue, DynamoDB, EventBridge Scheduler, SSM `SecureString` parameters, the AWS-managed SSM KMS key, CloudWatch, and SNS alarms. There is no ECS/Fargate service, VPC/NAT gateway, load balancer, Secrets Manager, or Cognito.
+The production AWS deployment is defined with TypeScript CDK in [infra/README.md](infra/README.md). Use the concise [deployment runbook](docs/deployment.md) for normal releases. It uses API Gateway, separate API and workflow Lambdas, SQS with a dead-letter queue, DynamoDB, EventBridge Scheduler, SSM `SecureString` parameters, the AWS-managed SSM KMS key, CloudWatch, and SNS alarms. There is no ECS/Fargate service, VPC/NAT gateway, load balancer, Secrets Manager, or Cognito.
 # budget-validation-api

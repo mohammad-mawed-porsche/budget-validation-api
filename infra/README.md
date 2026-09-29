@@ -63,16 +63,16 @@ The optimized `.lambda` directory includes the Linux x64 Argon2 binary required 
 CloudFormation cannot create SSM `SecureString` resources. Create these required values before deploying or starting the Lambdas:
 
 ```text
-/budget-validation/prod/AUTH_SESSION_SECRET
-/budget-validation/prod/AUTH_USERS_JSON
-/budget-validation/prod/MICROSOFT_CLIENT_SECRET
-/budget-validation/prod/PRODUCTIVE_API_KEY
+/budget-validation/production/AUTH_SESSION_SECRET
+/budget-validation/production/AUTH_USERS_JSON
+/budget-validation/production/MICROSOFT_CLIENT_SECRET
+/budget-validation/production/PRODUCTIVE_API_KEY
 ```
 
 To enable Slack delivery, also create this optional `SecureString` and deploy with `SlackNotificationsEnabled=true`:
 
 ```text
-/budget-validation/prod/SLACK_WEBHOOK_URL
+/budget-validation/production/SLACK_WEBHOOK_URL
 ```
 
 Generate an Argon2id password hash and prepare a local `auth-users.json` file:
@@ -98,25 +98,25 @@ Upload the values as `SecureString` parameters. Omitting `--key-id` intentionall
 
 ```sh
 aws ssm put-parameter \
-  --name /budget-validation/prod/AUTH_SESSION_SECRET \
+  --name /budget-validation/production/AUTH_SESSION_SECRET \
   --type SecureString \
   --value "$(openssl rand -base64 48)" \
   --overwrite
 
 aws ssm put-parameter \
-  --name /budget-validation/prod/AUTH_USERS_JSON \
+  --name /budget-validation/production/AUTH_USERS_JSON \
   --type SecureString \
   --value file://auth-users.json \
   --overwrite
 
 aws ssm put-parameter \
-  --name /budget-validation/prod/MICROSOFT_CLIENT_SECRET \
+  --name /budget-validation/production/MICROSOFT_CLIENT_SECRET \
   --type SecureString \
   --value 'YOUR_MICROSOFT_CLIENT_SECRET' \
   --overwrite
 
 aws ssm put-parameter \
-  --name /budget-validation/prod/PRODUCTIVE_API_KEY \
+  --name /budget-validation/production/PRODUCTIVE_API_KEY \
   --type SecureString \
   --value 'YOUR_PRODUCTIVE_API_KEY' \
   --overwrite
@@ -126,12 +126,21 @@ Do not commit `auth-users.json`. Delete it securely after uploading it. Each Lam
 
 ## Deploy
 
+For an existing stack, the safe release path is the code-only deployment described in [../docs/deployment.md](../docs/deployment.md). It carries forward the deployed CloudFormation parameters and never overwrites SSM secrets:
+
+```sh
+npm run aws:diff:code
+npm run aws:deploy:code
+```
+
+The explicit command below is primarily for the first deployment or an intentional parameter change.
+
 The non-secret identifiers are CloudFormation parameters:
 
 ```sh
 npm run infra:deploy -- \
   --parameters AllowedOrigins=https://your-frontend.example.com \
-  --parameters SecureParameterPrefix=/budget-validation/prod \
+  --parameters SecureParameterPrefix=/budget-validation/production \
   --parameters ProductiveOrganizationId=YOUR_PRODUCTIVE_ORG_ID \
   --parameters MicrosoftTokenUrl=https://login.microsoftonline.com/YOUR_TENANT/oauth2/v2.0/token \
   --parameters MicrosoftClientId=YOUR_MICROSOFT_CLIENT_ID \

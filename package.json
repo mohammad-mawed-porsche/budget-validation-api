@@ -19,6 +19,8 @@
     "auth:hash-password": "node scripts/hash-password.mjs",
     "infra:check": "npm run build && npm run build --prefix infra && npm test --prefix infra && npm run synth --prefix infra -- --quiet",
     "infra:deploy": "npm run deploy --prefix infra --",
+    "aws:diff:code": "node scripts/deploy-code-aws.mjs --diff",
+    "aws:deploy:code": "node scripts/deploy-code-aws.mjs",
     "aws:deploy": "node scripts/deploy-aws.mjs"
   },
   "dependencies": {
