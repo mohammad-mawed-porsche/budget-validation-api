@@ -29,7 +29,8 @@ export function registerScheduleRoutes(app: FastifyInstance, schedule: ScheduleS
       if (error instanceof RangeError) {
         return sendApiError(reply, 400, request.id, "INVALID_TIMEZONE", "timezone must be a valid IANA timezone.");
       }
-      throw error;
+      request.log.error({ err: error }, "AWS schedule update failed");
+      return sendApiError(reply, 502, request.id, "SCHEDULE_UPDATE_FAILED", "The AWS schedule could not be updated.");
     }
   });
 }

@@ -28,8 +28,17 @@ describe("ScheduleService", () => {
       },
     );
     const logger = { error: vi.fn() };
-    const schedule = new ScheduleService(repository, workflow, logger, 30_000, () => now);
+    const controller = { update: vi.fn(async () => {}) };
+    const schedule = new ScheduleService(repository, workflow, logger, 30_000, () => now, controller);
     await schedule.update({ enabled: true, time: "06:30", timezone: "Europe/Berlin", scope: "all", limit: null, dryRun: true });
+    expect(controller.update).toHaveBeenCalledWith({
+      enabled: true,
+      time: "06:30",
+      timezone: "Europe/Berlin",
+      scope: "all",
+      limit: null,
+      dryRun: true,
+    });
 
     await schedule.tick();
     await schedule.tick();

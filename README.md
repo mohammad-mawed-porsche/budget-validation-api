@@ -124,7 +124,7 @@ curl -X PUT http://localhost:3100/v1/schedule \
   }'
 ```
 
-The local scheduler stores the last local date it triggered, so polling cannot start the same schedule twice in one day. In AWS, the local scheduler is disabled and the CDK-managed EventBridge schedule is authoritative. The workflow also uses a repository-backed lock and rejects a second run while another run is active.
+The local scheduler stores the last local date it triggered, so polling cannot start the same schedule twice in one day. In AWS, the local timer is disabled and EventBridge Scheduler is authoritative. Authenticated `PUT /v1/schedule` requests update the real EventBridge expression, timezone, enabled state, and queued run request, then persist the displayed configuration in DynamoDB. The workflow also uses a repository-backed lock and rejects a second run while another run is active.
 
 ## Storage and notification cadence
 

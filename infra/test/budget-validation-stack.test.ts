@@ -57,6 +57,22 @@ describe("BudgetValidationStack", () => {
       FlexibleTimeWindow: { Mode: "OFF" },
       Target: Match.objectLike({ Input: Match.stringLikeRegexp('"trigger":"schedule"') }),
     });
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Handler: "api.handler",
+      Environment: {
+        Variables: Match.objectLike({ EVENTBRIDGE_SCHEDULE_NAME: { Ref: Match.anyValue() } }),
+      },
+    });
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: ["scheduler:GetSchedule", "scheduler:UpdateSchedule"],
+            Effect: "Allow",
+          }),
+        ]),
+      },
+    });
   });
 
   it("reads SSM SecureStrings and does not create Secrets Manager secrets", () => {

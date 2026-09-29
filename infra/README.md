@@ -25,6 +25,7 @@ Resources:
 - SQS workflow queue and dead-letter queue.
 - One reserved-concurrency workflow Lambda triggered with batches of one message.
 - EventBridge Scheduler for the daily run.
+- Authenticated schedule updates change the real EventBridge Scheduler expression, timezone, state, and queued run payload.
 - Encrypted DynamoDB single-table state with point-in-time recovery, TTL, deletion protection, and a history index.
 - SSM Parameter Store `SecureString` credentials encrypted with the AWS-managed SSM KMS key (`alias/aws/ssm`).
 - CloudWatch logs, dashboard, Lambda and dead-letter queue alarms, and an SNS alarm topic.
@@ -155,7 +156,9 @@ npm run infra:deploy -- \
 
 CDK outputs the API URL, DynamoDB table, workflow queue, dead-letter queue, parameter prefix, and alarm topic.
 
-Run a limited dry run through `POST /v1/runs`, inspect `GET /v1/runs/:runId`, and then enable the schedule:
+Run a limited dry run through `POST /v1/runs` and inspect `GET /v1/runs/:runId`. After validation, enable and edit the schedule through authenticated `PUT /v1/schedule` or the frontend operations panel. The API updates EventBridge directly with a resource-scoped IAM permission.
+
+The CDK parameters below remain useful for setting an initial schedule during infrastructure deployment:
 
 ```sh
 npm run infra:deploy -- \

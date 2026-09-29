@@ -11,6 +11,10 @@ export interface ScheduleUpdate {
   dryRun: boolean;
 }
 
+export interface ScheduleController {
+  update(input: ScheduleUpdate): Promise<void>;
+}
+
 interface ScheduleLogger {
   error(bindings: Record<string, unknown>, message: string): void;
 }
@@ -43,6 +47,7 @@ export class ScheduleService {
     private readonly logger: ScheduleLogger,
     private readonly pollIntervalMs: number,
     private readonly now: () => Date = () => new Date(),
+    private readonly controller?: ScheduleController,
   ) {}
 
   async get(): Promise<DailySchedule> {
@@ -68,6 +73,7 @@ export class ScheduleService {
       updatedAt: this.now().toISOString(),
       lastTriggeredLocalDate: timingChanged ? null : previous.lastTriggeredLocalDate,
     };
+    await this.controller?.update(input);
     await this.repository.saveSchedule(schedule);
     return schedule;
   }

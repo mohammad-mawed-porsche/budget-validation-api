@@ -242,7 +242,7 @@ export class BudgetValidationStack extends cdk.Stack {
     });
     workflowQueue.grantSendMessages(schedulerRole);
     deadLetterQueue.grantSendMessages(schedulerRole);
-    new scheduler.CfnSchedule(this, "DailySchedule", {
+    const dailySchedule = new scheduler.CfnSchedule(this, "DailySchedule", {
       flexibleTimeWindow: { mode: "OFF" },
       scheduleExpression: scheduleExpression.valueAsString,
       scheduleExpressionTimezone: scheduleTimezone.valueAsString,
@@ -259,6 +259,11 @@ export class BudgetValidationStack extends cdk.Stack {
         retryPolicy: { maximumEventAgeInSeconds: 3_600, maximumRetryAttempts: 2 },
       },
     });
+    apiFunction.addEnvironment("EVENTBRIDGE_SCHEDULE_NAME", dailySchedule.ref);
+    apiFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["scheduler:GetSchedule", "scheduler:UpdateSchedule"],
+      resources: [dailySchedule.attrArn],
+    }));
 
     const alarmTopic = new sns.Topic(this, "AlarmTopic", { displayName: "Budget validation alarms" });
     const apiErrorAlarm = apiFunction.metricErrors().createAlarm(this, "ApiErrorAlarm", {

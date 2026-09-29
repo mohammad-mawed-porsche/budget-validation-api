@@ -63,6 +63,7 @@ const schema = z.object({
   SLACK_WEBHOOK_URL: z.string().optional(),
   SCHEDULER_POLL_INTERVAL_MS: z.coerce.number().int().min(1_000).default(30_000),
   LOCAL_SCHEDULER_ENABLED: booleanString("true"),
+  EVENTBRIDGE_SCHEDULE_NAME: z.string().min(1).optional(),
   RUN_LOCK_TTL_SECONDS: z.coerce.number().int().min(300).max(86_400).default(21_600),
   SCHEDULED_RUN_SCOPE: z.enum(["all", "limit"]).default("all"),
   SCHEDULED_RUN_LIMIT: z.coerce.number().int().min(1).max(10_000).optional(),

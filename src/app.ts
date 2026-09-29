@@ -22,6 +22,7 @@ import { registerRunRoutes } from "./routes/runRoutes.js";
 import { registerScheduleRoutes } from "./routes/scheduleRoutes.js";
 import { SessionAuthService, StaticBearerAuthService, type AuthService, type InteractiveAuthService } from "./services/authService.js";
 import { NotificationService } from "./services/notificationService.js";
+import { EventBridgeScheduleController } from "./services/eventBridgeScheduleController.js";
 import { SqsRunDispatcher, type RunStarter } from "./services/runDispatcher.js";
 import { ScheduleService } from "./services/scheduleService.js";
 import { WorkflowAlreadyRunningError, WorkflowRunFailedError, WorkflowService } from "./services/workflowService.js";
@@ -157,6 +158,9 @@ export async function buildApplication(environment: Environment, overrides: Appl
     app.log,
     environment.SCHEDULER_POLL_INTERVAL_MS,
     overrides.now,
+    environment.EVENTBRIDGE_SCHEDULE_NAME
+      ? new EventBridgeScheduleController(environment.EVENTBRIDGE_SCHEDULE_NAME, environment.AWS_REGION)
+      : undefined,
   );
 
   registerAuthentication(app, auth);

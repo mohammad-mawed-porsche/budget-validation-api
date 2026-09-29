@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.883.0",
+    "@aws-sdk/client-scheduler": "^3.1142.0",
     "@aws-sdk/client-sqs": "^3.1134.0",
     "@aws-sdk/client-ssm": "^3.1134.0",
     "@aws-sdk/lib-dynamodb": "^3.883.0",
