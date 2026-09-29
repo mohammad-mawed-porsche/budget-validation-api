@@ -97,7 +97,7 @@ separate Lambda processes.
 | `GET` | `/v1/runs/:runId` | Read one run and all Cost ID results |
 | `GET` | `/v1/schedule` | Read the daily schedule |
 | `PUT` | `/v1/schedule` | Configure the daily schedule |
-| `GET` | `/v1/notifications?limit=50` | List prepared notification records |
+| `GET` | `/v1/notifications?limit=50` | List notification records (prepared, sent or failed) |
 | `POST` | `/v1/notifications/test` | Send a test message to the configured Slack channel |
 
 Run ten affiliations without writing to Heimdall or preparing notifications:
@@ -142,6 +142,19 @@ curl -X PUT http://localhost:3100/v1/schedule \
 ```
 
 The local scheduler stores the last local date it triggered, so polling cannot start the same schedule twice in one day. In AWS, the local timer is disabled and EventBridge Scheduler is authoritative. Authenticated `PUT /v1/schedule` requests update the real EventBridge expression, timezone, enabled state, and queued run request, then persist the displayed configuration in DynamoDB. The workflow also uses a repository-backed lock and rejects a second run while another run is active.
+
+## Dashboard
+
+**Heimdall Cost Center Reports** is the separate Next.js operator dashboard in
+`frontend-vis`. Its server authenticates to this API; AWS credentials and the
+Slack webhook are not needed in the browser or frontend configuration.
+
+The dashboard edits the daily schedule and polls run and delivery history every
+15 seconds. Activity, Runs and Slack deliveries have local search, status and
+rolling time filters. Filtering and pagination cover only the loaded history
+(up to 20 runs and 200 notification records), not every record in DynamoDB.
+Message previews are read-only; a sent record means the webhook was accepted,
+not that the owner read it. No new API endpoints are needed for these UI features.
 
 ## Storage and notification cadence
 
@@ -215,3 +228,6 @@ preserves existing stack parameters and leaves SSM secret values untouched.
 Check the actual EventBridge schedule before and after infrastructure changes;
 dashboard changes can differ from CloudFormation's original parameter values.
 The Next.js frontend is built and hosted separately.
+Frontend-only or documentation-only changes do not need an AWS stack update.
+If the reviewed CDK diff is empty, leave the running stack unchanged. A Git push
+publishes source code; it does not itself deploy either application.

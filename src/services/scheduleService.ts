@@ -2,14 +2,7 @@ import type { DailySchedule, RunRequest } from "../domain/models.js";
 import type { WorkflowRepository } from "../repositories/workflowRepository.js";
 import type { WorkflowService } from "./workflowService.js";
 
-export interface ScheduleUpdate {
-  enabled: boolean;
-  time: string;
-  timezone: string;
-  scope: "all" | "limit";
-  limit: number | null;
-  dryRun: boolean;
-}
+export type ScheduleUpdate = Omit<DailySchedule, "updatedAt" | "lastTriggeredLocalDate">;
 
 export interface ScheduleController {
   update(input: ScheduleUpdate): Promise<void>;
@@ -43,7 +36,7 @@ export class ScheduleService {
 
   constructor(
     private readonly repository: WorkflowRepository,
-    private readonly workflow: WorkflowService,
+    private readonly workflow: Pick<WorkflowService, "run">,
     private readonly logger: ScheduleLogger,
     private readonly pollIntervalMs: number,
     private readonly now: () => Date = () => new Date(),
@@ -67,13 +60,17 @@ export class ScheduleService {
     assertTimezone(input.timezone);
     const previous = await this.get();
     const timingChanged = previous.time !== input.time || previous.timezone !== input.timezone;
-    const schedule: DailySchedule = {
+    const normalizedInput: ScheduleUpdate = {
       ...input,
       limit: input.scope === "limit" ? input.limit : null,
+    };
+    const schedule: DailySchedule = {
+      ...normalizedInput,
       updatedAt: this.now().toISOString(),
       lastTriggeredLocalDate: timingChanged ? null : previous.lastTriggeredLocalDate,
     };
-    await this.controller?.update(input);
+    // Persist only after AWS accepts the same normalized settings.
+    await this.controller?.update(normalizedInput);
     await this.repository.saveSchedule(schedule);
     return schedule;
   }

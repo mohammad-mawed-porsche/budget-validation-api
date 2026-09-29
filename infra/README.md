@@ -76,10 +76,13 @@ To enable Slack delivery, also create this optional `SecureString` and deploy wi
 /budget-validation/production/SLACK_WEBHOOK_URL
 ```
 
-Generate an Argon2id password hash and prepare a local `auth-users.json` file:
+Generate an Argon2id password hash without putting the password in shell history
+or process arguments (run from the API repository root in zsh):
 
-```sh
-npm run auth:hash-password -- 'use-a-password-manager-generated-password'
+```zsh
+read -s "NEW_PASSWORD?New API password: "; echo
+printf '%s' "$NEW_PASSWORD" | npm run --silent auth:hash-password
+unset NEW_PASSWORD
 ```
 
 The JSON value must look like this:
@@ -95,35 +98,23 @@ The JSON value must look like this:
 ]
 ```
 
-Upload the values as `SecureString` parameters. Omitting `--key-id` intentionally selects the AWS-managed SSM KMS key:
+In the correct AWS account and region, use Systems Manager → Parameter Store
+to create the listed parameters as **SecureString**, using the AWS-managed
+SSM KMS key (`alias/aws/ssm`). Store the JSON above in `AUTH_USERS_JSON`, with
+the generated hash in `passwordHash`, never the plaintext password. Keep the
+original password and a random `AUTH_SESSION_SECRET` in an approved password
+manager. Do not paste secret values into CLI arguments, source files or screenshots.
 
-```sh
-aws ssm put-parameter \
-  --name /budget-validation/production/AUTH_SESSION_SECRET \
-  --type SecureString \
-  --value "$(openssl rand -base64 48)" \
-  --overwrite
+For an existing environment, update only the intended parameter. Do not replace
+working production values from a stale local `.env`; see the
+[secret rotation procedure](../docs/deployment.md#configuration-and-secret-deployment).
 
-aws ssm put-parameter \
-  --name /budget-validation/production/AUTH_USERS_JSON \
-  --type SecureString \
-  --value file://auth-users.json \
-  --overwrite
-
-aws ssm put-parameter \
-  --name /budget-validation/production/MICROSOFT_CLIENT_SECRET \
-  --type SecureString \
-  --value 'YOUR_MICROSOFT_CLIENT_SECRET' \
-  --overwrite
-
-aws ssm put-parameter \
-  --name /budget-validation/production/PRODUCTIVE_API_KEY \
-  --type SecureString \
-  --value 'YOUR_PRODUCTIVE_API_KEY' \
-  --overwrite
-```
-
-Do not commit `auth-users.json`. Delete it securely after uploading it. Each Lambda retrieves only the two values it needs with `ssm:GetParameters` and `WithDecryption=true`, then caches them for the lifetime of the warm execution environment. Parameter values are not included in Lambda environment variables, CDK context, CloudFormation, or stack outputs.
+Each Lambda retrieves its permitted values with `ssm:GetParameters` and
+`WithDecryption=true`, then caches them for the lifetime of the warm execution
+environment. The API reads authentication parameters; the worker reads
+integration parameters. Both can read the Slack webhook when delivery is
+enabled. Parameter values are not included in Lambda environment variables,
+CDK context, CloudFormation, or stack outputs.
 
 ## Deploy
 

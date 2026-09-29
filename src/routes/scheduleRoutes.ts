@@ -21,10 +21,7 @@ export function registerScheduleRoutes(app: FastifyInstance, schedule: ScheduleS
     const parsed = scheduleSchema.safeParse(request.body);
     if (!parsed.success) return sendValidationError(reply, request.id, parsed.error);
     try {
-      return reply.send(await schedule.update({
-        ...parsed.data,
-        limit: parsed.data.scope === "limit" ? parsed.data.limit : null,
-      }));
+      return reply.send(await schedule.update(parsed.data));
     } catch (error) {
       if (error instanceof RangeError) {
         return sendApiError(reply, 400, request.id, "INVALID_TIMEZONE", "timezone must be a valid IANA timezone.");

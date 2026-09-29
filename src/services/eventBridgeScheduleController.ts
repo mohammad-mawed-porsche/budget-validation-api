@@ -4,6 +4,7 @@ import {
   UpdateScheduleCommand,
 } from "@aws-sdk/client-scheduler";
 
+import type { WorkflowQueueMessage } from "../domain/workflowRequest.js";
 import type { ScheduleUpdate, ScheduleController } from "./scheduleService.js";
 
 export class EventBridgeScheduleController implements ScheduleController {
@@ -24,6 +25,15 @@ export class EventBridgeScheduleController implements ScheduleController {
     }
 
     const [hour, minute] = input.time.split(":");
+    const message: WorkflowQueueMessage = {
+      version: 1,
+      trigger: "schedule",
+      request: {
+        scope: input.scope,
+        limit: input.scope === "limit" ? input.limit : null,
+        dryRun: input.dryRun,
+      },
+    };
     await this.client.send(new UpdateScheduleCommand({
       Name: this.scheduleName,
       ...(existing.GroupName ? { GroupName: existing.GroupName } : {}),
@@ -33,15 +43,7 @@ export class EventBridgeScheduleController implements ScheduleController {
       FlexibleTimeWindow: existing.FlexibleTimeWindow ?? { Mode: "OFF" },
       Target: {
         ...existing.Target,
-        Input: JSON.stringify({
-          version: 1,
-          trigger: "schedule",
-          request: {
-            scope: input.scope,
-            limit: input.scope === "limit" ? input.limit : null,
-            dryRun: input.dryRun,
-          },
-        }),
+        Input: JSON.stringify(message),
       },
       ...(existing.Description ? { Description: existing.Description } : {}),
       ...(existing.StartDate ? { StartDate: existing.StartDate } : {}),
