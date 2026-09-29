@@ -264,6 +264,15 @@ export class BudgetValidationStack extends cdk.Stack {
       actions: ["scheduler:GetSchedule", "scheduler:UpdateSchedule"],
       resources: [dailySchedule.attrArn],
     }));
+    // UpdateSchedule resubmits the target role ARN. AWS therefore requires the
+    // caller to be allowed to pass that role back to EventBridge Scheduler.
+    apiFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["iam:PassRole"],
+      resources: [schedulerRole.roleArn],
+      conditions: {
+        StringEquals: { "iam:PassedToService": "scheduler.amazonaws.com" },
+      },
+    }));
 
     const alarmTopic = new sns.Topic(this, "AlarmTopic", { displayName: "Budget validation alarms" });
     const apiErrorAlarm = apiFunction.metricErrors().createAlarm(this, "ApiErrorAlarm", {

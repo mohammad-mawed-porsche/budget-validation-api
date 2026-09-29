@@ -73,6 +73,19 @@ describe("BudgetValidationStack", () => {
         ]),
       },
     });
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: "iam:PassRole",
+            Effect: "Allow",
+            Condition: {
+              StringEquals: { "iam:PassedToService": "scheduler.amazonaws.com" },
+            },
+          }),
+        ]),
+      },
+    });
   });
 
   it("reads SSM SecureStrings and does not create Secrets Manager secrets", () => {
