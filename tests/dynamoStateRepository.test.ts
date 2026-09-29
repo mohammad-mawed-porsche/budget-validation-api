@@ -63,4 +63,23 @@ describe("DynamoStateRepository", () => {
     const repository = new DynamoStateRepository({ tableName: "state", region: "eu-central-1" });
     await expect(repository.getRun("run-1")).resolves.toEqual(value);
   });
+
+  it("lists run summaries without querying or returning result records", async () => {
+    const value = run();
+    const metadata = Object.fromEntries(
+      Object.entries(value).filter(([key]) => key !== "results"),
+    ) as Omit<WorkflowRun, "results">;
+    dynamo.on(QueryCommand).resolves({ Items: [
+      { PK: "RUN#run-1", SK: "META", entity: "run", GSI1PK: "RUN", GSI1SK: "date", resultCount: 1, ...metadata },
+    ] });
+    const repository = new DynamoStateRepository({ tableName: "state", region: "eu-central-1" });
+
+    await expect(repository.listRuns(20)).resolves.toEqual([{ ...metadata, results: [] }]);
+    expect(dynamo.commandCalls(QueryCommand)).toHaveLength(1);
+    expect(dynamo.commandCalls(QueryCommand)[0]?.args[0].input).toMatchObject({
+      TableName: "state",
+      IndexName: "GSI1",
+      Limit: 20,
+    });
+  });
 });

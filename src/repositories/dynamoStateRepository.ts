@@ -31,6 +31,14 @@ function chunks<T>(values: T[], size: number): T[][] {
   return output;
 }
 
+const RUN_METADATA_STORAGE_KEYS = new Set(["PK", "SK", "entity", "GSI1PK", "GSI1SK", "resultCount"]);
+
+function runMetadata(item: Record<string, unknown>): Omit<WorkflowRun, "results"> {
+  return Object.fromEntries(
+    Object.entries(item).filter(([key]) => !RUN_METADATA_STORAGE_KEYS.has(key)),
+  ) as Omit<WorkflowRun, "results">;
+}
+
 export class DynamoStateRepository implements WorkflowRepository, AuthRepository {
   private readonly client: DynamoDBDocumentClient;
   private readonly indexName: string;
@@ -135,9 +143,7 @@ export class DynamoStateRepository implements WorkflowRepository, AuthRepository
     const results = items
       .filter((item) => typeof item.SK === "string" && item.SK.startsWith("RESULT#"))
       .map((item) => item.result as RunResult);
-    const metadataKeys = new Set(["PK", "SK", "entity", "GSI1PK", "GSI1SK", "resultCount"]);
-    const run = Object.fromEntries(Object.entries(meta).filter(([key]) => !metadataKeys.has(key)));
-    return { ...(run as Omit<WorkflowRun, "results">), results };
+    return { ...runMetadata(meta), results };
   }
 
   async listRuns(limit: number) {
@@ -149,8 +155,7 @@ export class DynamoStateRepository implements WorkflowRepository, AuthRepository
       ScanIndexForward: false,
       Limit: limit,
     }));
-    const ids = (response.Items ?? []).map((item) => item.id).filter((id): id is string => typeof id === "string");
-    return (await Promise.all(ids.map((id) => this.getRun(id)))).filter((run): run is WorkflowRun => run !== null);
+    return (response.Items ?? []).map((item) => ({ ...runMetadata(item), results: [] }));
   }
 
   async saveNotification(notification: NotificationRecord) {

@@ -93,7 +93,7 @@ separate Lambda processes.
 | `POST` | `/v1/auth/logout` | Revoke the current session |
 | `GET` | `/v1/auth/me` | Read the authenticated identity and roles |
 | `POST` | `/v1/runs` | Start the workflow asynchronously (`202 Accepted`) |
-| `GET` | `/v1/runs?limit=20` | List persisted runs |
+| `GET` | `/v1/runs?limit=20` | List persisted run metadata and summaries (`results` is empty) |
 | `GET` | `/v1/runs/:runId` | Read one run and all Cost ID results |
 | `GET` | `/v1/schedule` | Read the daily schedule |
 | `PUT` | `/v1/schedule` | Configure the daily schedule |

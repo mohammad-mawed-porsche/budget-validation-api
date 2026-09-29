@@ -31,7 +31,11 @@ export class MemoryWorkflowRepository implements WorkflowRepository {
   }
 
   async listRuns(limit: number) {
-    return structuredClone(this.runs.slice(0, limit));
+    return this.runs.slice(0, limit).map((run) => {
+      const summary = structuredClone(run);
+      summary.results = [];
+      return summary;
+    });
   }
 
   async saveNotification(notification: NotificationRecord) {

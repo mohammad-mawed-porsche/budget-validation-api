@@ -116,7 +116,11 @@ export class FileWorkflowRepository implements WorkflowRepository {
 
   async listRuns(limit: number): Promise<WorkflowRun[]> {
     await this.ready();
-    return clone(this.data.runs.slice(0, limit));
+    return this.data.runs.slice(0, limit).map((run) => {
+      const summary = clone(run);
+      summary.results = [];
+      return summary;
+    });
   }
 
   async saveNotification(notification: NotificationRecord): Promise<void> {
