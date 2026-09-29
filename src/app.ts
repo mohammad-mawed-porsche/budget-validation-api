@@ -58,6 +58,14 @@ export async function buildApplication(environment: Environment, overrides: Appl
         paths: [
           "req.headers.authorization",
           "req.headers.x-api-key",
+          "req.headers.cookie",
+          "res.headers['set-cookie']",
+          "req.body.password",
+          "password",
+          "accessToken",
+          "refreshToken",
+          "AUTH_SESSION_SECRET",
+          "AUTH_USERS_JSON",
           "PRODUCTIVE_API_KEY",
           "MICROSOFT_CLIENT_SECRET",
           "SLACK_WEBHOOK_URL",
@@ -68,6 +76,9 @@ export async function buildApplication(environment: Environment, overrides: Appl
   });
   await app.register(helmet);
   await app.register(cookie);
+  app.addHook("onSend", async (request, reply) => {
+    if (request.url.startsWith("/v1/")) reply.header("Cache-Control", "no-store");
+  });
   await app.register(cors, {
     origin: environment.CORS_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
     credentials: environment.AUTH_MODE === "local-users",

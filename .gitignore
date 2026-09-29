@@ -3,9 +3,13 @@ dist/
 .lambda/
 coverage/
 .env
+.env.*
+!.env.example
 .data/
 auth-users.json
 .DS_Store
 *.log
+*.pem
+refresh-cookie*.txt
 infra/node_modules/
 infra/cdk.out/

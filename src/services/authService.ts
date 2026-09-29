@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { verify as verifyPassword } from "argon2";
 import { jwtVerify, SignJWT } from "jose";
@@ -49,13 +49,11 @@ function equalSecret(actual: string, expected: string): boolean {
   const right = createHash("sha256").update(expected).digest();
   return timingSafeEqual(left, right);
 }
-function createRefreshToken(sessionId: string): string {
-  return `${sessionId}.${randomBytes(32).toString("base64url")}`;
-}
 function refreshSessionId(token: string): string | null {
   if (token.length > 512) return null;
-  const [sessionId, secret, ...extra] = token.split(".");
-  return sessionId && secret && extra.length === 0 ? sessionId : null;
+  const parts = token.split(".");
+  if (parts.length !== 2 && parts.length !== 3) return null;
+  return /^[a-f0-9-]{36}$/i.test(parts[0] ?? "") && /^[A-Za-z0-9_-]{43}$/.test(parts[1] ?? "") ? parts[0]! : null;
 }
 
 export class StaticBearerAuthService implements AuthService {
@@ -86,6 +84,25 @@ export class SessionAuthService implements InteractiveAuthService {
 
   private attemptKey(username: string, ipAddress: string) {
     return hash(`${username.trim().toLowerCase()}\n${ipAddress}`);
+  }
+
+  private refreshSignature(value: string) {
+    return createHmac("sha256", this.key).update(`budget-refresh.v1.${value}`).digest("base64url");
+  }
+
+  private createRefreshToken(sessionId: string) {
+    const value = `${sessionId}.${randomBytes(32).toString("base64url")}`;
+    return `${value}.${this.refreshSignature(value)}`;
+  }
+
+  private signedRefreshToken(token: string) {
+    const parts = token.split(".");
+    return parts.length === 3 && equalSecret(parts[2]!, this.refreshSignature(`${parts[0]}.${parts[1]}`));
+  }
+
+  private sessionUserAllowed(session: AuthSession) {
+    const user = this.users.get(session.username.toLowerCase());
+    return Boolean(user && !user.disabled && [...user.roles].sort().join(",") === [...session.roles].sort().join(","));
   }
 
   private async signAccessToken(session: AuthSession) {
@@ -132,7 +149,7 @@ export class SessionAuthService implements InteractiveAuthService {
 
     const now = this.now();
     const id = this.uuid();
-    const refresh = createRefreshToken(id);
+    const refresh = this.createRefreshToken(id);
     const session: AuthSession = {
       id,
       username: user.username,
@@ -171,6 +188,7 @@ export class SessionAuthService implements InteractiveAuthService {
       const session = await this.repository.getSession(sessionId);
       const now = this.now().getTime();
       if (!session || session.revokedAt || session.username !== username || Date.parse(session.absoluteExpiresAt) <= now || Date.parse(session.idleExpiresAt) <= now) return null;
+      if (!this.sessionUserAllowed(session)) return null;
       if (session.roles.join(",") !== tokenRoles.join(",")) return null;
       return { subject: username, username, sessionId, roles: [...session.roles] };
     } catch { return null; }
@@ -181,14 +199,22 @@ export class SessionAuthService implements InteractiveAuthService {
     if (!sessionId) throw new InvalidSessionError("Refresh session is invalid.");
     const session = await this.repository.getSession(sessionId);
     const now = this.now();
-    if (!session || session.revokedAt || !equalSecret(hash(token), session.refreshTokenHash)
+    // A known session ID is not proof of token possession. A signed old token
+    // can trigger replay revocation; arbitrary garbage must never revoke it.
+    // Accept the current legacy two-part token once to migrate existing sessions.
+    const currentLegacyToken = token.split(".").length === 2 && session && equalSecret(hash(token), session.refreshTokenHash);
+    if (!session || (!this.signedRefreshToken(token) && !currentLegacyToken)) {
+      throw new InvalidSessionError("Refresh session is invalid or expired.");
+    }
+    if (session.revokedAt || !equalSecret(hash(token), session.refreshTokenHash)
+      || !this.sessionUserAllowed(session)
       || Date.parse(session.absoluteExpiresAt) <= now.getTime() || Date.parse(session.idleExpiresAt) <= now.getTime()
       || (session.userAgentHash && session.userAgentHash !== hash(context.userAgent ?? ""))) {
-      if (session) await this.repository.revokeSession(session.id, now.toISOString());
+      await this.repository.revokeSession(session.id, now.toISOString());
       throw new InvalidSessionError("Refresh session is invalid or expired.");
     }
 
-    const rotated = createRefreshToken(session.id);
+    const rotated = this.createRefreshToken(session.id);
     const updated: AuthSession = {
       ...session,
       refreshTokenHash: hash(rotated),
@@ -205,7 +231,12 @@ export class SessionAuthService implements InteractiveAuthService {
 
   async logout(token: string | null, authorization: string | undefined): Promise<void> {
     const refreshId = token ? refreshSessionId(token) : null;
-    if (refreshId) return this.repository.revokeSession(refreshId, this.now().toISOString());
+    if (refreshId && token) {
+      const session = await this.repository.getSession(refreshId);
+      if (session && equalSecret(hash(token), session.refreshTokenHash)) {
+        return this.repository.revokeSession(refreshId, this.now().toISOString());
+      }
+    }
     const principal = await this.authenticate(authorization);
     if (principal) await this.repository.revokeSession(principal.sessionId, this.now().toISOString());
   }

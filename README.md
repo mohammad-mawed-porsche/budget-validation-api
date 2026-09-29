@@ -7,11 +7,16 @@ A standalone Fastify/TypeScript service for the **Budget validation** workflow:
 3. Select the single budget whose date range is active today.
 4. Validate its total and usage.
 5. Update Heimdall only when the result is definitive and changed.
-6. Prepare an owner notification, subject to a seven-day cooldown.
+6. Send an invalid-budget alert to the configured Slack channel, identifying the
+   affected owners, subject to a seven-day cooldown. Without Slack enabled, save
+   the prepared notification instead.
 
 This folder contains only the workflow API. It does not copy the dashboard or other `frontend-vis` features.
 
 See [docs/architecture.md](docs/architecture.md) for the request flow and the PNG architecture diagram. The SSO, CDK, secret-handling, verification, and rollback procedure is in [docs/deployment.md](docs/deployment.md).
+
+[SECURITY.md](SECURITY.md) explains authentication, roles, encryption, secret
+access, logging, rotation and the limits of the current implementation.
 
 ## Important behavior
 
@@ -49,15 +54,23 @@ Requirements: Node.js 22 or newer.
 
 ```sh
 cp .env.example .env
-npm install
+npm ci
 npm run dev
 ```
 
 Generate an Argon2id password hash, place it in `AUTH_USERS_JSON`, set a random `AUTH_SESSION_SECRET`, and fill in the Productive and Microsoft credentials before starting:
 
-```sh
-npm run auth:hash-password -- 'a-password-manager-generated-password'
+```zsh
+read -s "NEW_PASSWORD?New API password: "; echo
+printf '%s' "$NEW_PASSWORD" | npm run --silent auth:hash-password
+unset NEW_PASSWORD
 ```
+
+The hashing script reads stdin only; do not put passwords in command arguments
+or shell history. Its output is an Argon2id hash, not the original password.
+Production local-user mode rejects the development signing secret and requires
+secure refresh cookies. Keep signing secrets random and different from the
+dashboard's signing secret.
 
 Login returns a short-lived access token and sets a rotating refresh token in an `HttpOnly` cookie. Protected requests use:
 
@@ -65,7 +78,9 @@ Login returns a short-lived access token and sets a rotating refresh token in an
 Authorization: Bearer <ACCESS_TOKEN>
 ```
 
-`GET /health` and `GET /ready` are public for deployment health checks.
+`GET /health` and `GET /ready` are public process checks. They do not establish
+that Productive, Heimdall or Slack are working, or report worker progress across
+separate Lambda processes.
 
 ## Endpoints
 
@@ -88,15 +103,17 @@ Authorization: Bearer <ACCESS_TOKEN>
 Run ten affiliations without writing to Heimdall or preparing notifications:
 
 ```sh
-curl -c refresh-cookie.txt -X POST http://localhost:3100/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"your-password"}'
+read -s "PASSWORD?API password: "; echo
+ACCESS_TOKEN=$(printf '%s' "$PASSWORD" | jq -Rs '{username:"admin",password:.}' | \
+  curl -fsS -X POST http://localhost:3100/v1/auth/login \
+    -H 'Content-Type: application/json' --data-binary @- | jq -er '.accessToken')
+unset PASSWORD
 
-# Copy accessToken from the login response.
 curl -X POST http://localhost:3100/v1/runs \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"scope":"limit","limit":10,"dryRun":true}'
+# unset ACCESS_TOKEN when finished.
 ```
 
 Run all affiliations normally:
@@ -171,8 +188,13 @@ Authentication is self-managed rather than Cognito. It supports Argon2id credent
 - Updates happen only for a changed `valid` or `invalid` decision; `unknown` never clears or overwrites status.
 - Run history is saved throughout processing, not only at the end.
 - Manual runs return immediately and are polled through `GET /v1/runs/:runId`.
-- Secrets and authorization headers are redacted from logs.
-- Slack uses an SSM `SecureString` webhook URL that is readable only by the API and workflow Lambdas; App ID, OAuth client credentials, and verification tokens are not required for incoming-webhook messages.
+- Known credential fields, authorization/cookie headers and token fields are
+  redacted from structured application logs. Review new log statements and
+  exception text; redaction is not a universal secret detector.
+- Slack uses an SSM `SecureString` webhook. CDK grants the API and workflow
+  Lambdas read access to it; AWS administrators or other explicitly permitted
+  identities can also read it. App ID, OAuth client credentials and verification
+  tokens are not required for incoming-webhook messages. DMs are not implemented.
 
 ## Quality commands
 
@@ -186,4 +208,10 @@ npm run check
 ```
 
 The production AWS deployment is defined with TypeScript CDK in [infra/README.md](infra/README.md). Use the concise [deployment runbook](docs/deployment.md) for normal releases. It uses API Gateway, separate API and workflow Lambdas, SQS with a dead-letter queue, DynamoDB, EventBridge Scheduler, SSM `SecureString` parameters, the AWS-managed SSM KMS key, CloudWatch, and SNS alarms. There is no ECS/Fargate service, VPC/NAT gateway, load balancer, Secrets Manager, or Cognito.
-# budget-validation-api
+
+For a normal release, run `npm run check`, inspect `npm run aws:diff:code`, then
+run `npm run aws:deploy:code` with the correct AWS SSO profile and region. This
+preserves existing stack parameters and leaves SSM secret values untouched.
+Check the actual EventBridge schedule before and after infrastructure changes;
+dashboard changes can differ from CloudFormation's original parameter values.
+The Next.js frontend is built and hosted separately.

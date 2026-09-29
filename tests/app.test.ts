@@ -74,12 +74,28 @@ afterEach(async () => {
 });
 
 describe("API", () => {
+  it("does not let forwarded headers bypass login throttling when proxy trust is disabled", async () => {
+    const passwordHash = await hash("test-only-password", { type: 2, memoryCost: 19_456, timeCost: 2, parallelism: 1 });
+    application = await buildApplication({
+      ...environment, AUTH_MODE: "local-users", AUTH_LOGIN_MAX_ATTEMPTS: 2,
+      AUTH_USERS_JSON: JSON.stringify([{ username: "viewer", passwordHash, roles: ["viewer"] }]),
+    }, { productive, heimdall, repository: new MemoryWorkflowRepository(), authRepository: new MemoryAuthRepository(), logger: false });
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const result = await application.app.inject({
+        method: "POST", url: "/v1/auth/login", remoteAddress: "192.0.2.10",
+        headers: { "x-forwarded-for": `198.51.100.${attempt}` },
+        payload: { username: "viewer", password: "wrong" },
+      });
+      expect(result.statusCode).toBe(attempt < 3 ? 401 : 429);
+    }
+  });
+
   it("leaves health public and protects workflow endpoints", async () => {
     application = await buildApplication(environment, {
       productive,
       heimdall,
       repository: new MemoryWorkflowRepository(),
-      logger: false,
+      // Exercise the real logger/redaction configuration; LOG_LEVEL is silent.
     });
 
     expect((await application.app.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
@@ -197,6 +213,7 @@ describe("API", () => {
       payload: { username: "viewer", password: "correct horse battery staple" },
     });
     expect(login.statusCode).toBe(200);
+    expect(login.headers["cache-control"]).toBe("no-store");
     const accessToken = login.json().accessToken as string;
     const setCookie = login.headers["set-cookie"];
     const refreshCookie = (Array.isArray(setCookie) ? setCookie[0] : setCookie)?.split(";", 1)[0];
@@ -218,6 +235,8 @@ describe("API", () => {
       payload: { scope: "all", dryRun: true },
     });
     expect(forbidden.statusCode).toBe(403);
+    const forbiddenSchedule = await application.app.inject({ method: "PUT", url: "/v1/schedule", headers: { authorization: `Bearer ${accessToken}` }, payload: { enabled: false } });
+    expect(forbiddenSchedule.statusCode).toBe(403);
 
     const forbiddenSlackTest = await application.app.inject({
       method: "POST",

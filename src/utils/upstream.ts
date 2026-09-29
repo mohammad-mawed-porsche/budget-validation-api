@@ -48,7 +48,8 @@ export async function fetchWithRetry(
     const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
     let response: Response;
     try {
-      response = await fetchImpl(input, { ...init, signal });
+      // Never forward integration credentials or OAuth bodies to a redirect target.
+      response = await fetchImpl(input, { ...init, redirect: "error", signal });
     } catch (error) {
       if (init.signal?.aborted) throw error;
       if (attempt >= options.maxRetries) {

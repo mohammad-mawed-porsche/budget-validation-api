@@ -12,7 +12,9 @@ let proxy: Proxy | undefined;
 async function getProxy(): Promise<Proxy> {
   if (proxy) return proxy;
   await loadSecureParameters("api");
-  const { app } = await buildApplication(loadEnvironment());
+  // The Lambda adapter sets the socket address from API Gateway's trusted
+  // requestContext.http.sourceIp. Do not let forwarded headers override it.
+  const { app } = await buildApplication({ ...loadEnvironment(), TRUST_PROXY: false });
   proxy = awsLambdaFastify<APIGatewayProxyEventV2>(app, { decorateRequest: false });
   return proxy;
 }

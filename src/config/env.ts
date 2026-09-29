@@ -103,5 +103,13 @@ export function loadEnvironment(environment: NodeJS.ProcessEnv = process.env): E
   if (!result.success) {
     throw new Error(`Invalid environment configuration:\n${z.prettifyError(result.error)}`);
   }
+  if (environment.NODE_ENV === "production" && result.data.AUTH_MODE === "local-users") {
+    if (result.data.AUTH_SESSION_SECRET === "local-development-secret-change-me-now") {
+      throw new Error("Production requires a unique AUTH_SESSION_SECRET.");
+    }
+    if (!result.data.AUTH_COOKIE_SECURE) {
+      throw new Error("Production requires AUTH_COOKIE_SECURE=true and HTTPS.");
+    }
+  }
   return result.data;
 }
