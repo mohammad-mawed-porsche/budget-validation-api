@@ -1,0 +1,55 @@
+{
+  "name": "budget-validation-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsup src/server.ts --format esm --clean --sourcemap && npm run build:lambda",
+    "build:lambda": "tsup --config tsup.lambda.config.ts && node scripts/package-lambda.mjs",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "auth:hash-password": "node scripts/hash-password.mjs",
+    "infra:check": "npm run build && npm run build --prefix infra && npm test --prefix infra && npm run synth --prefix infra -- --quiet",
+    "infra:deploy": "npm run deploy --prefix infra --",
+    "aws:deploy": "node scripts/deploy-aws.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.883.0",
+    "@aws-sdk/client-sqs": "^3.1134.0",
+    "@aws-sdk/client-ssm": "^3.1134.0",
+    "@aws-sdk/lib-dynamodb": "^3.883.0",
+    "@fastify/aws-lambda": "^6.4.1",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/helmet": "^13.0.2",
+    "argon2": "^0.44.0",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.7.4",
+    "jose": "^6.1.0",
+    "pino": "^10.3.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/aws-lambda": "^8.10.163",
+    "@types/node": "^22.19.11",
+    "aws-sdk-client-mock": "^4.1.0",
+    "eslint": "^9.39.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0",
+    "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
+  }
+}
